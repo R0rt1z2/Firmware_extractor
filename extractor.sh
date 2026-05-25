@@ -687,6 +687,19 @@ for partition in $PARTITIONS; do
     fi
 done
 
+# Extract MediaTek firmware images
+if [[ -n "${romzip}" ]] && [ -f "${romzip}" ]; then
+    EXTRA_FILES=$(7z l -ba "${romzip}" 2>/dev/null | gawk '{ print $NF }' \
+        | grep -E '(^|/)((lk|preloader|tee|tz)([0-9]+|_[^/]*)?\.(img|bin)|DA(_[^/]*)?\.bin)$')
+    if [[ -n "${EXTRA_FILES}" ]]; then
+        mkdir -p "${outdir}/firmware"
+        for f in ${EXTRA_FILES}; do
+            LOGI "Extracting firmware image: $(basename "${f}")"
+            7z e -y "${romzip}" "${f}" -o"${outdir}/firmware" 2>/dev/null >> "${tmpdir}"/zip.log
+        done
+    fi
+fi
+
 # Specifically check if input is 'radio.img'
 if 7z l -ba "${romzip}" 2>/dev/null | grep -q radio.img; then
     ## Extract 'radio.img' from archive'
