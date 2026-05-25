@@ -43,7 +43,9 @@ LOGE() {
 ## Fatal
 LOGF() {
     echo -e "[\033[41mFATAL\033[0m]: ${1}"
-    exit 1
+    if [ "${2:-1}" -ne 0 ]; then
+        exit 1
+    fi
 }
 
 superimage() {
@@ -268,15 +270,13 @@ if [[ "${romzip}" == *.@(img|bin) ]] && [ "$(head -c6 "${romzip}" | tr '\0' '\n'
     ## Logical
     LOGI "Extracting partitions with 'rkImageMaker'..."
     "${rk_extract}" -unpack "${romzip}" "${tmpdir}" > /dev/null || {
-        LOGF "Extraction with 'rkImageMaker' failed."
-        exit 1
+        LOGF "Extraction with 'rkImageMaker' failed." 0
     }
 
     ## Firmware
     LOGI "Extracting partitions with 'afptool'..."
     "${afptool_extract}" -unpack "${tmpdir}/firmware.img" "${tmpdir}" > /dev/null || {
-        LOGF "Extraction with 'afptool' failed."
-        exit 1
+        LOGF "Extraction with 'afptool' failed." 0
     }
 
     # In case output was a 'super.img', execute 'superimage'
@@ -610,7 +610,7 @@ elif 7z l -ba "${romzip}" 2>/dev/null | grep tar.md5 | gawk '{ print $NF }' | gr
         find "$tmpdir" -maxdepth 1 -type f -name "*.img.ext4" | rename 's/.img.ext4/.img/g' > /dev/null 2>&1
     fi
     if [[ ! -f system.img ]]; then
-        LOGF "Extract failed"
+        LOGF "Extract failed" 0
         rm -rf "$tmpdir"
         exit 1
     fi
