@@ -451,11 +451,12 @@ elif 7z l -ba "${romzip}" 2>/dev/null | grep -q "super.img"; then
 
     # Extract detected image(s)    
     FOUND=$(7z l -ba "${romzip}" | gawk '{ print $NF }' | grep "super.img" | tr '\n' ' ')
-    7z x -y "${romzip}" ${FOUND} >> "$tmpdir"/zip.log
+    7z e -y "${romzip}" ${FOUND} >> "$tmpdir"/zip.log
 
     # If image is a 'super.img_sparsechunk', convert via 'simg2img'
     if echo "${FOUND}" | grep -q "sparsechunk"; then
-        ${simg2img} ${FOUND} "${PWD}/super.img.raw" 2>/dev/null
+        CHUNKS=$(for f in ${FOUND}; do basename "$f"; done | tr '\n' ' ')
+        ${simg2img} ${CHUNKS} "${PWD}/super.img.raw" 2>/dev/null
     fi
 
     # Run 'superimage' function over the 'super.img'
