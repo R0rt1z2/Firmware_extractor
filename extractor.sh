@@ -21,6 +21,7 @@
 # RUU
 # Amlogic upgrade package
 # Rockchip upgrade package
+# Compressed tarballs (tar.gz, tar.bz2, tar.xz, tar.zst)
 # super.img
 # payload.bin
 
@@ -183,6 +184,31 @@ elif echo "${romzip}" | grep -q ".pac$"; then
 fi
 
 MAGIC=$(head -c12 "${romzip}" | tr -d '\0')
+
+# Compressed tarballs (detected by magic, since vendors ship them as '.zip')
+# '7z l' only lists the inner '.tar' of those, so unpack it and start over.
+case "$(od -A n -t x1 -N 6 "${romzip}" | tr -d ' \n')" in
+    1f8b*) DECOMPRESS="gzip -dc" ;;
+    425a68*) DECOMPRESS="bzip2 -dc" ;;
+    fd377a585a00) DECOMPRESS="xz -dc" ;;
+    28b52ffd*) DECOMPRESS="zstd -dc" ;;
+    *) DECOMPRESS="" ;;
+esac
+if [[ -n "${DECOMPRESS}" ]] && \
+    [[ "$(${DECOMPRESS} "${romzip}" 2>/dev/null | head -c 262 | tail -c 5)" == "ustar" ]]; then
+    LOGI "Compressed tarball detected"
+
+    TARBALL="${tmpdir}/tarball/$(basename "${romzip%.*}").tar"
+    mkdir -p "$(dirname "${TARBALL}")"
+
+    LOGI "Decompressing tarball..."
+    ${DECOMPRESS} "${romzip}" > "${TARBALL}" || {
+        LOGF "Tarball decompression failed!"
+    }
+
+    "$LOCALDIR/extractor.sh" "${TARBALL}" "${outdir}"
+    exit
+fi
 
 # File is '.ozip'
 if [[ "${MAGIC}" == "OPPOENCRYPT!" ]] || [[ "${romzipext}" == "ozip" ]]; then
