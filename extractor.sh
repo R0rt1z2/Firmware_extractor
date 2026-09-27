@@ -503,7 +503,7 @@ elif 7z l -ba "${romzip}" 2>/dev/null | grep -q "super.img"; then
 
     # Run 'superimage' function over the 'super.img'
     superimage
-elif 7z l -ba "${romzip}" 2>/dev/null | gawk '{print $NF}' | grep "system_new.img\|^system.img\|\/system.img\|\/system_image.emmc.img\|^system_image.emmc.img"; then
+elif 7z l -ba "${romzip}" 2>/dev/null | gawk '{print $NF}' | grep -q "system_new.img\|^system.img\|/system.img\|/system_image.emmc.img\|^system_image.emmc.img"; then
     LOGI "Image detected"
     7z x -y "${romzip}" 2>/dev/null >> "$tmpdir"/zip.log
     find "$tmpdir"/ -name "* *" -type d,f | rename 's/ /_/g' > /dev/null 2>&1 # removes space from file name
