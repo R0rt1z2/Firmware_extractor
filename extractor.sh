@@ -543,12 +543,32 @@ elif 7z l -ba "${romzip}" 2>/dev/null | grep -q "system.sin\|.*system_.*\.sin"; 
     fi
 elif 7z l -ba "${romzip}" 2>/dev/null | grep -q ".pac$"; then
     unisoc
-elif 7z l -ba "${romzip}" 2>/dev/null | grep -q "*system.bin*"; then
+elif 7z l -ba "${romzip}" 2>/dev/null | gawk '{ print $NF }' | grep -qE '(^|/)(system|super)(_a)?\.bin$'; then
     LOGI "bin images detected"
     7z x -y "${romzip}" 2>/dev/null >> "$tmpdir"/zip.log
-    find "$tmpdir"/ -mindepth 2 -type f -name "*.bin" -exec mv {} . \; # move .img in sub-dir to $tmpdir
-    find "$tmpdir" -maxdepth 1 -type f -name "*.bin" | rename 's/.bin/.img/g' > /dev/null 2>&1 # proper names
+    find "$tmpdir"/ -mindepth 2 -type f -name "*.bin" -exec mv {} . \; # move .bin in sub-dir to $tmpdir
+
+    # Rename to '.img', preferring slot 'a' over slot 'b' for A/B dumps
+    for f in *.bin; do
+        [ -f "$f" ] || continue
+        case "$f" in
+            *_a.bin) mv "$f" "${f%_a.bin}.img" ;;
+            *_b.bin)
+                if [ -f "${f%_b.bin}_a.bin" ] || [ -f "${f%_b.bin}.img" ]; then
+                    rm -f "$f"
+                else
+                    mv "$f" "${f%_b.bin}.img"
+                fi
+                ;;
+            *) mv "$f" "${f%.bin}.img" ;;
+        esac
+    done
+
     romzip=""
+    if [ -f super.img ]; then
+        LOGI "Extracting 'super.img'..."
+        superimage
+    fi
 elif 7z l -ba "${romzip}" 2>/dev/null | grep -q "system-p"; then
     LOGI "P suffix images detected"
     for partition in $PARTITIONS; do
