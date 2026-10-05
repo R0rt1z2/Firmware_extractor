@@ -2,6 +2,7 @@
 
 # Supported Firmwares:
 # Aonly OTA
+# File-based OTA
 # Raw image
 # tarmd5
 # chunk image
@@ -425,6 +426,46 @@ if 7z l -ba "${romzip}" 2>/dev/null | grep -q system.new.dat; then
             rm -rf "$line".transfer.list "$line".new.dat
         done
     done
+elif 7z l -ba "${romzip}" 2>/dev/null | gawk '{ print $NF }' | grep -q "^system/build.prop$" && \
+    7z l -ba "${romzip}" 2>/dev/null | grep -q "META-INF/com/google/android/updater-script"; then
+    LOGI "File-based OTA detected"
+
+    # Partitions are shipped as plain directories, extract them as-is
+    LISTING=$(7z l -ba "${romzip}" 2>/dev/null | gawk '{ print $NF }')
+    for p in ${PARTITIONS}; do
+        if echo "${LISTING}" | grep -q "^${p}/"; then
+            LOGI "Extracting '${p}/'..."
+            7z x -y "${romzip}" "${p}/*" -o"${outdir}" 2>/dev/null >> "$tmpdir"/zip.log
+        fi
+    done
+
+    # 'recovery/' gets installed on top of '/system'
+    if [ -d "${outdir}/recovery" ]; then
+        cp -a "${outdir}/recovery/." "${outdir}/system/"
+        rm -rf "${outdir}/recovery"
+    fi
+
+    # Recreate symlinks the updater script would have created
+    7z e -y "${romzip}" META-INF/com/google/android/updater-script 2>/dev/null >> "$tmpdir"/zip.log
+    tr '\n' ' ' < updater-script | grep -oP 'symlink\([^)]*\)' | while read -r call; do
+        mapfile -t args < <(echo "${call}" | grep -oP '"\K[^"]*(?=")')
+        for link in "${args[@]:1}"; do
+            dest="${outdir}${link}"
+            [ -d "$(dirname "${dest}")" ] && [ ! -e "${dest}" ] && [ ! -L "${dest}" ] && \
+                ln -s "${args[0]}" "${dest}"
+        done
+    done
+
+    # Raw images flashed alongside the file-based partitions
+    7z e -y "${romzip}" boot.img recovery.img 2>/dev/null >> "$tmpdir"/zip.log
+    for f in NON-HLOS.bin:modem tz.mbn:tz; do
+        IN=$(echo "${LISTING}" | grep -m1 "\(^\|/\)${f%%:*}$")
+        if [ -n "${IN}" ]; then
+            7z e -y "${romzip}" "${IN}" 2>/dev/null >> "$tmpdir"/zip.log
+            mv "$(basename "${IN}")" "${f##*:}.img"
+        fi
+    done
+    romzip=""
 elif 7z l -ba "${romzip}" 2>/dev/null | grep -q rawprogram; then
     LOGI "QFIL package detected"
 
