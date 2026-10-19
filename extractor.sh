@@ -770,6 +770,21 @@ for partition in $PARTITIONS; do
         fi
     fi
 
+    # Newer '7z' aborts on squashfs images whose symlinks resolve through
+    # another link (flagged as "dangerous"), so unpack them here with
+    # 'unsquashfs' when available. '-no-xattrs' avoids a non-zero exit when run
+    # without root (SELinux labels can't be restored and aren't needed).
+    if [ -f "${outdir}"/"$partition".img ] && \
+       [[ "$(file -b "${outdir}"/"$partition".img)" == *Squashfs* ]] && \
+       command -v unsquashfs > /dev/null 2>&1; then
+        LOGI "Extracting squashfs '$partition' via 'unsquashfs'..."
+        if unsquashfs -no-xattrs -f -d "${outdir}"/"$partition" "${outdir}"/"$partition".img >> "$tmpdir"/zip.log 2>&1; then
+            rm -f "${outdir}"/"$partition".img
+        else
+            LOGE "Failed extracting squashfs '$partition'; leaving image for '7z'."
+        fi
+    fi
+
     if [ ! -s "${outdir}"/"$partition".img ] && [ -f "${outdir}"/"$partition".img ]; then
         rm "${outdir}"/"$partition".img
     fi
